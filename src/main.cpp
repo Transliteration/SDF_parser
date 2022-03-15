@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <set>
+#include <iomanip>
 
 struct Point3D
 {
@@ -16,12 +17,12 @@ class Atom;
 
 struct Bond
 {
-    std::weak_ptr<Atom> atom;
-    // Atom* atom;
+    std::weak_ptr<Atom> from, to;
     int type;
 
-    Bond(std::weak_ptr<Atom> a, int type)
-    : atom(a)
+    Bond(std::weak_ptr<Atom> from, std::weak_ptr<Atom> to, int type)
+    : from(from)
+    , to(to)
     , type(type)
     {}
 };
@@ -29,12 +30,6 @@ struct Bond
 
 struct Atom
 {
-    std::vector<Bond> bondTo;
-    bool visited = false; 
-    bool marked_to_delete = false;
-    std::weak_ptr<Atom> visited_from;
-    int vis_count = 0;
-
     union 
     {
         Point3D coords;
@@ -46,40 +41,61 @@ struct Atom
     {}
 
     Atom() {}
-
-
 };
 
 std::ostream& operator<<(std::ostream& os, Atom &a)
 {
-    os << a.x << "\t" << a.y << "\t" << a.z << "\t" << a.visited;
-    if (!a.visited_from.expired())
-        os << '\t' << a.visited_from.lock()->x;
-    os << '\t' << a.vis_count;
+    os << std::setw(8) << a.x << std::setw(8) << a.y << std::setw(8) << a.z << '\n';
     return os;
 }
 
 std::ostream& operator<<(std::ostream& os, Bond &bond)
 {
-    os << bond.atom.lock()->x << "\t" << bond.atom.lock()->y << "\t" << bond.atom.lock()->z;
+    os << '\t' << *(bond.from.lock().get()) << "\t" << *(bond.to.lock().get());
     return os;
 }
 
 struct Graph
 {
     std::vector<std::shared_ptr<Atom>> atoms;
+    std::vector<std::shared_ptr<Bond>> bonds;
 
-    Graph(size_t atom_num)
-    : atoms(atom_num)
+    Graph(size_t atom_count, std::vector<Point3D> point3Ds, std::vector<std::vector<size_t>> bonds)
+    : atoms(atom_count)
     {
-        // std::cout << atoms.size() << "\n";
-        // std::cout << atoms.capacity() << "\n";
+        size_t atom_num = 0;
+
+        for (auto &atom : point3Ds)
+        {
+            atoms[atom_num++] = std::make_shared<Atom>(atom);
+            // std::cout << atom_num << '\n';
+        }
+
+        for (auto &&bond : bonds)
+        {
+            size_t from, to, type;
+            from = bond[0] - 1;
+            to = bond[1] - 1;
+            type = bond[2];
+            add_bidirectional_bond(from, to, type);
+        }
     }
 
     void add_bidirectional_bond(size_t a1, size_t a2, size_t type)
     {
-        atoms[a1]->bondTo.push_back(Bond(atoms[a2],type));
-        atoms[a2]->bondTo.push_back(Bond(atoms[a1],type));
+        bonds.push_back(std::make_shared<Bond>(atoms[a1], atoms[a2], type));
+        bonds.push_back(std::make_shared<Bond>(atoms[a2], atoms[a1], type));
+    }
+
+    std::vector<std::shared_ptr<Bond>> find_bonds_of_atom(std::shared_ptr<Atom> atom)
+    {
+        std::vector<std::shared_ptr<Bond>> ret;
+
+        for (auto &&bond : bonds)
+            if (bond->from.lock() == atom)
+                ret.push_back(bond);
+
+        return ret;
     }
 
     void print_graph()
@@ -88,9 +104,9 @@ struct Graph
         for (auto &&atom : atoms)
         {
             std::cout << atom_num++ << ')' << *atom << '\n';
-            for (auto &bond : atom->bondTo)
+            for (auto &bond : find_bonds_of_atom(atom))
             {
-                std::cout << "\t  " << bond << '\n';
+                std::cout << *(bond.get()) << '\n';
             }
             std::cout << '\n';
         }
@@ -98,43 +114,13 @@ struct Graph
 
     void print_hanging_atoms()
     {
-        size_t atom_num = 1;
-
-        std::vector<size_t> atoms_to_delete;
-
-        for (int i = atoms.size() - 1; i >= 0; i--)
-        {
-            if (atoms[i]->bondTo.size() == 1) 
-            {
-                atoms_to_delete.push_back(i);   
-                auto &&temp_bonds = atoms[i]->bondTo[0].atom.lock()->bondTo;
-                for (size_t k = 0; k < temp_bonds.size(); k++)
-                {
-                    if (temp_bonds[k].atom.lock()->x == atoms[i]->x)
-                    {
-                        std::cout << "equal\n";
-                        temp_bonds.erase(temp_bonds.begin() + k);
-                        break;
-                    } 
-                }
-            }
-        }
-
-        for (auto &&i : atoms_to_delete)
-        {
-            // for (auto &j : atoms[i]->bondTo)
-            // {
-            //     j.atom.lock()->bondTo.    
-            // }
-            
-            atoms.erase(atoms.begin()+i);
-        }
-        
+        size_t atom_num = 0;
         for (auto &&atom : atoms)
         {
-            if (atom->bondTo.size() == 1)
-                std::cout << *atom << " " << atom_num << '\n';
             atom_num++;
+            if (find_bonds_of_atom(atom).size() == 1)
+                std::cout << atom_num << '\n';
+            
         }
     }
 
@@ -149,73 +135,8 @@ struct Graph
 
     void find_cycles()
     {
-        std::weak_ptr<Atom> cur_atom = atoms[0];
-        cur_atom.lock()->visited = true;
-        cur_atom.lock()->vis_count++;
-        // cur_atom.lock()->visited_from = cur_atom;
-        std::vector<std::weak_ptr<Atom>> next_atoms;
-        for (auto &&bond : cur_atom.lock()->bondTo)
-        {
-            if (bond.atom.lock()->visited == false)
-            {
-                bond.atom.lock()->visited_from = cur_atom;
-                // bond.atom->visited = true;
-                bond.atom.lock()->vis_count++;
-                next_atoms.push_back(bond.atom);
-            }
-        }
-
-        std::set<std::shared_ptr<Atom>> cycle_ends;
-
-        size_t op_count = 0;
-
-        while (next_atoms.size() != 0)
-        {
-            
-            cur_atom = next_atoms.back();
-            next_atoms.pop_back();
-            if (cur_atom.lock()->visited) continue;
-            cur_atom.lock()->visited = true;
-            for (auto &&bond : cur_atom.lock()->bondTo)
-            {
-                op_count++;
-                if (bond.atom.lock()->visited == false)
-                {
-                    bond.atom.lock()->visited_from = cur_atom;
-                    bond.atom.lock()->vis_count++;
-                    // bond.atom->visited = true;
-                    if (!bond.atom.lock()->visited)
-                        next_atoms.push_back(bond.atom);
-                }
-                else
-                {
-                    cur_atom.lock()->vis_count++;
-                    if (cur_atom.lock()->vis_count > 2)
-                        cycle_ends.insert(cur_atom.lock());
-                    // cur_atom.lock()->visited_from->marked_to_delete = true;
-                    cur_atom.lock()->visited_from.lock()->marked_to_delete = true;
-                }
-            }
-        }  
-
-        std::cout << "OP=" << op_count << '\n' << "SIZE=" << cycle_ends.size() << '\n';
-
-        // std::set<std::weak_ptr<Atom>> cycle;
-
-        for (auto atom : cycle_ends)
-        {
-            while (atom->visited_from.lock()->marked_to_delete)
-            {
-                atom->marked_to_delete = true;
-                atom = atom->visited_from.lock();
-                std::cout << "1\n";
-            }
-            std::cout << *(atom.get()) << "-------<Atom\n";
-
-        }
-
-            
     }
+
 };
 
 
@@ -254,26 +175,7 @@ struct SDFFileParser
 
     Graph build_graph()
     {
-        Graph graph(counts_line[0]);
-
-        size_t atom_num = 0;
-
-        for (auto &atom : point3Ds)
-        {
-            graph.atoms[atom_num++] = std::make_shared<Atom>(atom);
-            // std::cout << atom_num << '\n';
-        }
-
-        for (auto &&bond : bonds)
-        {
-            size_t from, to, type;
-            from = bond[0] - 1;
-            to = bond[1] - 1;
-            type = bond[2];
-            graph.add_bidirectional_bond(from, to, type);
-        }
-        
-        
+        Graph graph(counts_line[0], point3Ds, bonds);
 
         return graph;
     }
@@ -368,8 +270,8 @@ int main()
     // graph.print_bonds();
     graph.print_hanging_atoms();
     // graph.print_bonds();
-    graph.print_graph();
-    graph.find_cycles();
-    graph.print_graph();
+    // graph.print_graph();
+    // graph.find_cycles();
+    // graph.print_graph();
     return 0;
 }
