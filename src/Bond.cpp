@@ -10,6 +10,6 @@ Bond::Bond(std::weak_ptr<Atom> from, std::weak_ptr<Atom> to, int type)
 
 std::ostream& operator<<(std::ostream& os, Bond &bond)
 {
-    os << '\t' << *(bond.from.lock().get()) << "\t" << *(bond.to.lock().get());
+    os << "  From:\t" << *(bond.from.lock().get()) << "    To:\t" << *(bond.to.lock().get());
     return os;
 }

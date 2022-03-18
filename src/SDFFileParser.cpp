@@ -29,7 +29,7 @@ bool SDFFileParser::parse_sdf_file()
 
 Graph SDFFileParser::build_graph()
 {
-    Graph graph(counts_line[0], point3Ds, bonds);
+    Graph graph(counts_line[0], atoms, bonds);
 
     return graph;
 }
@@ -76,7 +76,7 @@ bool SDFFileParser::read_atom_block()
         char atom_name;
         ss >> x >> y >> z >> atom_name;
         // if (atom_name == 'H') continue;
-        point3Ds.push_back({x, y, z});
+        atoms.emplace_back(Point3D(x,y,z), atom_name);
         // std::cout << x << ", " << y << ", " << z << "\n";
     }
     

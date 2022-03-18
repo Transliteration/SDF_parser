@@ -15,7 +15,7 @@ struct SDFFileParser
 {
     std::ifstream file;
     std::array<int, 8> counts_line;
-    std::vector<Point3D> point3Ds;
+    std::vector<Atom> atoms;
     std::vector<std::vector<size_t>> bonds;
 
 

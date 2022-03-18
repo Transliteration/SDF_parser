@@ -9,8 +9,9 @@ struct Atom
         Point3D coords;
         struct {double x,y,z;};
     };
+    char type;
 
-    Atom(Point3D &coords);
+    Atom(Point3D coords, char type = ' ');
     Atom();
 };
 
