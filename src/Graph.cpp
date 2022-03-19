@@ -93,18 +93,17 @@ void Graph::delete_hanging_atoms()
 
 void Graph::bfs(std::shared_ptr<Atom> curr_atom, 
                 std::map<std::shared_ptr<Atom>, std::shared_ptr<Bond>> &visited_atoms, 
-                std::set<std::shared_ptr<Bond>> &marked_atoms,
-                std::shared_ptr<Bond> prev_bond)
+                std::set<std::shared_ptr<Bond>> &marked_atoms)
 {
 
     // deque for atoms bound to curr_atom
     std::deque<std::shared_ptr<Atom>> atom_queue;
 
     // add curr_atom and bond, which lead to curr_atom, to map
-    visited_atoms.insert({curr_atom, prev_bond});
+    visited_atoms.insert({curr_atom, nullptr});
 
     curr_atom = atoms[0];
-    prev_bond = nullptr;
+    std::shared_ptr<Bond> prev_bond = nullptr;
     while (atom_queue.size() > 0 || prev_bond == nullptr)
     {
         // std::cout << "curr_atom=" << *curr_atom;
@@ -146,107 +145,109 @@ void Graph::bfs(std::shared_ptr<Atom> curr_atom,
     
 }
 
-// TODO for now delete atoms in cycle, then delete bonds with at least one expired reference
-// needs to delete bonds, then delete atoms without bonds
 void Graph::find_cycles()
 {
-    std::map<std::shared_ptr<Atom>, std::shared_ptr<Bond>> visited_atoms;
-    std::set<std::shared_ptr<Bond>> found_bonds;
-    bfs(atoms[0], visited_atoms, found_bonds, nullptr);
-    std::set<std::shared_ptr<Atom>> marked_atoms;
-    std::cout << "Visited Atoms:" << visited_atoms.size() << '\n';
+    std::map<std::shared_ptr<Atom>, std::shared_ptr<Bond>> visited_atoms; // assosiate atom with bond from which it was reached
+    std::set<std::shared_ptr<Bond>> found_bonds; // store bonds which lead to already iterated atom by bfs
+
+    bfs(atoms[0], visited_atoms, found_bonds);
+
+    std::set<std::shared_ptr<Bond>> marked_bonds; // store bonds which belong to cycle (for deletion)
+    // std::cout << "Visited Atoms:" << visited_atoms.size() << '\n';
     for (auto &&[atom, bond] : visited_atoms)
     {
         if (visited_atoms.count(atom) == 1) continue;
-        // marked_atoms.push_back(atom);
-        std::cout << *atom;
-        // check for input atom
+        // std::cout << *atom;
+
+        // check for input atom (which has no prev_bond)
         if (bond != nullptr)
             std::cout << *bond;
     }
 
     std::cout << "Marked count:" << found_bonds.size() << '\n';
 
+    // for each bond used times
     for (auto &&bond : found_bonds)
     {
+        // mark for deletion
+        marked_bonds.insert(bond);
+        // create atoms to iterate backwards through cycle
         std::shared_ptr<Atom> atom  = bond->from.lock(),
                               atom2 = bond->to.lock();
 
+        // store atom found in cycle
         std::set<std::shared_ptr<Atom>> path;
         path.insert(atom2);
         path.insert(atom);
 
-        auto lamb = [&visited_atoms](auto a)->auto { 
-            std::shared_ptr<Atom> ret = nullptr;
-            
-            if (!visited_atoms.contains(a)) return ret;
+        //[1] found which bond lead to atom (a),
+        //[2] mark this bond for deletion,
+        //[3] return atom from other side of bond (iterate backwars) 
+        auto find_prev_atom_and_mark_bond = [&visited_atoms, &marked_bonds](auto a)->auto { 
+            std::shared_ptr<Atom> ret = nullptr; // if 
+            if (a == nullptr || !visited_atoms.contains(a)) 
+            {
+                std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n\n\n\n";
+                return ret;
+            }
 
-            std::shared_ptr<Bond> bond = visited_atoms.find(a)->second;
+            std::shared_ptr<Bond> bond = visited_atoms.find(a)->second; // [1]
             if (bond != nullptr)
             {
+                marked_bonds.insert(bond); // [2]
                 if (bond->from.lock() == a)
-                    return bond->to.lock();
+                    return bond->to.lock(); // [3]
                 else if (bond->to.lock() == a)
-                    return bond->from.lock();
+                    return bond->from.lock(); // [3]
             }
-            
-            return ret;
+            std::cout << "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n\n\n\n";
+            return ret; 
         };
 
-        // {
-        //     std::shared_ptr<Bond> bond = visited_atoms.find(atom)->second;
-        //     if (bond->from.lock() == atom)
-        //         atom2 = bond->to.lock();
-        //     else if (bond->to.lock() == atom)
-        //         atom2 = bond->from.lock();
-        // }
-        
-        for (int i = 0; i < 13; i++)
+        int cycle_max_len = atoms.size();
+        for (int i = 0; i < cycle_max_len; i++)
         {
             if (atom2 == atom)
             {
-                std::cout << "Found cross!" << i << '\n';
+                // std::cout << "Found cycle! Length: " << i << '\n';
                 // std::cout << *atom << *atom2;
-
                 break;
             }
+            // iterate atoms backwards one at a time
             if (i%2 == 0)
             {
-                atom2 = lamb(atom2);
+                atom2 = find_prev_atom_and_mark_bond(atom2);
                 path.insert(atom2);
             }
             else
             {
-                atom = lamb(atom);
+                atom = find_prev_atom_and_mark_bond(atom);
                 path.insert(atom);
             }
         }
-        for (auto &&atom : path)
-        {
-            std::cout << *atom;
-            marked_atoms.insert(atom);
-            // for (auto &&bond : find_bonds_of_atom(atom))
-            // {
-            //     std::cout << *bond;
-            // }
-            
-        }
-        std::cout << "END of cycle\n";
+        // print all atoms in found cycle
+        // for (auto &&atom : path)
+        // {
+        //     if (atom != nullptr)
+        //         std::cout << *atom;
+        //     else
+        //         std::cout << "nullptr\n";
+        // }
+        // std::cout << "END of cycle\n";
         
     }
 
+    // erase marked bonds
+    std::erase_if(bonds, [&marked_bonds](std::shared_ptr<Bond> bond) 
+        { return  marked_bonds.contains(bond); }
+    );
+    // clear temporary containers
+    marked_bonds.clear();
     visited_atoms.clear();
     found_bonds.clear();
 
-    std::erase_if(atoms, [&marked_atoms](std::shared_ptr<Atom> atom) 
-        { return  marked_atoms.contains(atom); }
+    // delete atoms without bonds
+    std::erase_if(atoms, [this](std::shared_ptr<Atom> atom) 
+        { return  find_bonds_of_atom(atom).size() == 0; }
     );
-    marked_atoms.clear();
-    std::erase_if(bonds, [](std::shared_ptr<Bond> bond) 
-        { return  bond->to.expired() || bond->from.expired(); }
-    );
-
-
-    
-    
 }

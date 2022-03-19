@@ -31,6 +31,5 @@ struct Graph
 
     void bfs(std::shared_ptr<Atom> atom,
              std::map<std::shared_ptr<Atom>, std::shared_ptr<Bond>> &visited_from,
-             std::set<std::shared_ptr<Bond>> &found_bonds,
-             std::shared_ptr<Bond> prev_bond);
+             std::set<std::shared_ptr<Bond>> &found_bonds);
 };
