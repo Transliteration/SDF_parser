@@ -154,17 +154,17 @@ void Graph::find_cycles()
 
     std::set<std::shared_ptr<Bond>> marked_bonds; // store bonds which belong to cycle (for deletion)
     // std::cout << "Visited Atoms:" << visited_atoms.size() << '\n';
-    for (auto &&[atom, bond] : visited_atoms)
-    {
-        if (visited_atoms.count(atom) == 1) continue;
-        // std::cout << *atom;
+    // print visited atoms info
+    // for (auto &&[atom, bond] : visited_atoms)
+    // {
+    //     // std::cout << *atom;
 
-        // check for input atom (which has no prev_bond)
-        if (bond != nullptr)
-            std::cout << *bond;
-    }
+    //     // check for input atom (which has no prev_bond)
+    //     // if (bond != nullptr)
+    //     //     std::cout << *bond;
+    // }
 
-    std::cout << "Marked count:" << found_bonds.size() << '\n';
+    // std::cout << "Marked count:" << found_bonds.size() << '\n';
 
     // for each bond used times
     for (auto &&bond : found_bonds)
@@ -187,7 +187,6 @@ void Graph::find_cycles()
             std::shared_ptr<Atom> ret = nullptr; // if 
             if (a == nullptr || !visited_atoms.contains(a)) 
             {
-                std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n\n\n\n";
                 return ret;
             }
 
@@ -200,7 +199,6 @@ void Graph::find_cycles()
                 else if (bond->to.lock() == a)
                     return bond->from.lock(); // [3]
             }
-            std::cout << "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n\n\n\n";
             return ret; 
         };
 

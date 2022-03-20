@@ -1,4 +1,7 @@
-CFLAGS = -Wall -std=gnu++2a -O3
+PATH_TO_EIGEN_DIR = /Eigen
+# CFLAGS = -Wall -std=gnu++2a -O3 -I $(PATH_TO_EIGEN_DIR)/Eigen
+CFLAGS =  -Wall -std=gnu++2a -O3 
+CFLAGS_EIGEN = -Wall -std=c++17 -O3 -I /src/Eigen/Eigen
 
 OBJ_FILES = bin/main.o \
 			bin/Atom.o \
