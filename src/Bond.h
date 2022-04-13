@@ -2,6 +2,7 @@
 #include <memory>
 #include "Atom.h"
 
+// Bond based on weak_ptr
 struct Bond
 {
     std::weak_ptr<Atom> from, to;
@@ -11,3 +12,10 @@ struct Bond
 };
 
 std::ostream& operator<<(std::ostream& os, Bond &bond);
+
+/* Bond based on atom indexes */
+struct iBond
+{
+    int in1, in2;
+    iBond(int in1, int in2);
+};
